@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calculadora de arbitraje de tasa</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121933;
+      --panel-2: #182245;
+      --text: #ecf1ff;
+      --muted: #a8b3d1;
+      --ok: #32d296;
+      --warn: #ffb020;
+      --bad: #ff6b6b;
+      --line: #2a3768;
+      --accent: #6ea8fe;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #0b1020 0%, #0f1630 100%);
+      color: var(--text);
+    }
+
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 28px 18px 60px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+      line-height: 1.1;
+    }
+
+    .sub {
+      color: var(--muted);
+      margin: 0 0 24px;
+      max-width: 900px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.25fr 1fr;
+      gap: 18px;
+    }
+
+    .card {
+      background: rgba(18, 25, 51, 0.92);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.22);
+    }
+
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: 1.15rem;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 0.92rem;
+      color: var(--muted);
+    }
+
+    input, select {
+      width: 100%;
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid #324074;
+      border-radius: 12px;
+      padding: 11px 12px;
+      font-size: 0.98rem;
+      outline: none;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(110, 168, 254, 0.18);
+    }
+
+    .full { grid-column: 1 / -1; }
+
+    .results {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    .metric {
+      background: #0f1630;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .metric .k {
+      color: var(--muted);
+      font-size: 0.86rem;
+      margin-bottom: 6px;
+    }
+
+    .metric .v {
+      font-size: 1.28rem;
+      font-weight: 700;
+    }
+
+    .big {
+      grid-column: 1 / -1;
+      padding: 16px;
+    }
+
+    .signal {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-top: 8px;
+    }
+
+    .ok { background: rgba(50, 210, 150, 0.16); color: var(--ok); }
+    .warn { background: rgba(255, 176, 32, 0.14); color: var(--warn); }
+    .bad { background: rgba(255, 107, 107, 0.15); color: var(--bad); }
+
+    .note {
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 0.95rem;
+    }
+
+    th, td {
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th { color: var(--muted); font-weight: 600; }
+    .mono { font-variant-numeric: tabular-nums; }
+    .pill {
+      display: inline-block;
+      padding: 5px 9px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      border: 1px solid var(--line);
+      color: var(--muted);
+    }
+
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+      .form-grid, .results { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Calculadora de arbitraje de tasa</h1>
+    <p class="sub">
+      Estima tasa implícita y oportunidades entre <strong>futuros</strong>, <strong>sintético con opciones</strong>
+      y <strong>caución</strong>. El modelo usa una aproximación simple de paridad put-call:
+      <strong>F sintético = Strike + Call - Put</strong>.
+    </p>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Entradas</h2>
+        <div class="form-grid">
+          <div class="field">
+            <label for="spot">Spot / Contado</label>
+            <input id="spot" type="number" step="0.0001" value="1000" />
+          </div>
+          <div class="field">
+            <label for="future">Precio del futuro</label>
+            <input id="future" type="number" step="0.0001" value="1045" />
+          </div>
+          <div class="field">
+            <label for="strike">Strike</label>
+            <input id="strike" type="number" step="0.0001" value="1000" />
+          </div>
+          <div class="field">
+            <label for="days">Días al vencimiento</label>
+            <input id="days" type="number" step="1" value="30" />
+          </div>
+          <div class="field">
+            <label for="call">Prima Call</label>
+            <input id="call" type="number" step="0.0001" value="70" />
+          </div>
+          <div class="field">
+            <label for="put">Prima Put</label>
+            <input id="put" type="number" step="0.0001" value="30" />
+          </div>
+          <div class="field">
+            <label for="caucionRate">Tasa caución nominal anual (%)</label>
+            <input id="caucionRate" type="number" step="0.01" value="38" />
+          </div>
+          <div class="field">
+            <label for="commission">Costo total por unidad</label>
+            <input id="commission" type="number" step="0.0001" value="2" />
+          </div>
+          <div class="field">
+            <label for="multiplier">Multiplicador contrato</label>
+            <input id="multiplier" type="number" step="1" value="1" />
+          </div>
+          <div class="field">
+            <label for="threshold">Umbral mínimo neto por unidad</label>
+            <input id="threshold" type="number" step="0.0001" value="1" />
+          </div>
+          <div class="field full">
+            <label for="dayCount">Base anual</label>
+            <select id="dayCount">
+              <option value="365">365</option>
+              <option value="360">360</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Resumen</h2>
+        <div class="results">
+          <div class="metric">
+            <div class="k">Futuro sintético</div>
+            <div class="v mono" id="syntheticFuture">-</div>
+          </div>
+          <div class="metric">
+            <div class="k">Costo carry por caución</div>
+            <div class="v mono" id="carryCost">-</div>
+          </div>
+          <div class="metric">
+            <div class="k">Tasa implícita futuro</div>
+            <div class="v mono" id="futureRate">-</div>
+          </div>
+          <div class="metric">
+            <div class="k">Tasa implícita sintético</div>
+            <div class="v mono" id="syntheticRate">-</div>
+          </div>
+          <div class="metric big">
+            <div class="k">Mejor arbitraje detectado</div>
+            <div class="v" id="bestTrade">-</div>
+            <div id="signal" class="signal warn">Esperando cálculo</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="card" style="margin-top: 18px;">
+      <h2>Comparativa de estrategias</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Estrategia</th>
+            <th>Precio / spread observado</th>
+            <th>Ganancia neta por unidad</th>
+            <th>Ganancia neta total</th>
+            <th>Tasa anualizada aprox.</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <strong>Cash & carry con futuro</strong><br />
+              <span class="pill">Comprar spot + financiar con caución + vender futuro</span>
+            </td>
+            <td class="mono" id="ccSpread">-</td>
+            <td class="mono" id="ccUnit">-</td>
+            <td class="mono" id="ccTotal">-</td>
+            <td class="mono" id="ccRate">-</td>
+          </tr>
+          <tr>
+            <td>
+              <strong>Reverse cash & carry con futuro</strong><br />
+              <span class="pill">Vender spot + colocar tasa + comprar futuro</span>
+            </td>
+            <td class="mono" id="rccSpread">-</td>
+            <td class="mono" id="rccUnit">-</td>
+            <td class="mono" id="rccTotal">-</td>
+            <td class="mono" id="rccRate">-</td>
+          </tr>
+          <tr>
+            <td>
+              <strong>Arbitraje futuro vs sintético</strong><br />
+              <span class="pill">Si futuro &gt; sintético: vender futuro / comprar sintético</span>
+            </td>
+            <td class="mono" id="fsSpread">-</td>
+            <td class="mono" id="fsUnit">-</td>
+            <td class="mono" id="fsTotal">-</td>
+            <td class="mono" id="fsRate">-</td>
+          </tr>
+          <tr>
+            <td>
+              <strong>Sintético vs caución</strong><br />
+              <span class="pill">Comparación de tasa implícita vs tasa de fondeo</span>
+            </td>
+            <td class="mono" id="scSpread">-</td>
+            <td class="mono" id="scUnit">-</td>
+            <td class="mono" id="scTotal">-</td>
+            <td class="mono" id="scRate">-</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="note">
+        Interpretación rápida: si la tasa implícita del futuro o del sintético supera la tasa de caución,
+        hay carry positivo para financiar la compra del activo y vender el derivado. Si queda por debajo,
+        el sesgo favorece la operación inversa. Los resultados no incluyen restricciones operativas, márgenes,
+        haircuts, costos fiscales ni riesgo de ejercicio temprano.
+      </p>
+    </section>
+  </div>
+
+  <script>
+    const ids = [
+      'spot','future','strike','days','call','put','caucionRate','commission','multiplier','threshold','dayCount'
+    ];
+
+    const fmt = (n, d = 4) => {
+      if (!isFinite(n)) return '-';
+      return new Intl.NumberFormat('es-AR', {
+        minimumFractionDigits: d,
+        maximumFractionDigits: d
+      }).format(n);
+    };
+
+    const fmtPct = (n) => {
+      if (!isFinite(n)) return '-';
+      return `${fmt(n, 2)}%`;
+    };
+
+    const get = (id) => Number(document.getElementById(id).value || 0);
+
+    function setText(id, value) {
+      document.getElementById(id).textContent = value;
+    }
+
+    function annualize(ret, days, base) {
+      if (days <= 0) return NaN;
+      return ret * (base / days) * 100;
+    }
+
+    function calc() {
+      const S = get('spot');
+      const F = get('future');
+      const K = get('strike');
+      const D = get('days');
+      const C = get('call');
+      const P = get('put');
+      const caucionRatePct = get('caucionRate');
+      const fee = get('commission');
+      const mult = get('multiplier');
+      const threshold = get('threshold');
+      const base = get('dayCount');
+
+      const r = caucionRatePct / 100;
+      const syntheticF = K + C - P;
+      const carryCost = S * r * (D / base);
+      const fairFromCaucion = S + carryCost;
+
+      const futureRate = annualize((F / S) - 1, D, base);
+      const syntheticRate = annualize((syntheticF / S) - 1, D, base);
+
+      const cashCarryUnit = F - fairFromCaucion - fee;
+      const reverseCashCarryUnit = (S * (1 + r * D / base)) - F - fee;
+      const futureVsSyntheticUnit = Math.abs(F - syntheticF) - fee;
+      const syntheticVsCaucionUnit = syntheticF - fairFromCaucion - fee;
+
+      const cashCarryTotal = cashCarryUnit * mult;
+      const reverseCashCarryTotal = reverseCashCarryUnit * mult;
+      const futureVsSyntheticTotal = futureVsSyntheticUnit * mult;
+      const syntheticVsCaucionTotal = syntheticVsCaucionUnit * mult;
+
+      const cashCarryRate = annualize(cashCarryUnit / S, D, base);
+      const reverseCashCarryRate = annualize(reverseCashCarryUnit / S, D, base);
+      const futureVsSyntheticRate = annualize((Math.abs(F - syntheticF) - fee) / S, D, base);
+      const syntheticVsCaucionRate = annualize(syntheticVsCaucionUnit / S, D, base);
+
+      setText('syntheticFuture', fmt(syntheticF));
+      setText('carryCost', fmt(carryCost));
+      setText('futureRate', fmtPct(futureRate));
+      setText('syntheticRate', fmtPct(syntheticRate));
+
+      setText('ccSpread', `Futuro - spot financiado = ${fmt(F - fairFromCaucion)}`);
+      setText('ccUnit', fmt(cashCarryUnit));
+      setText('ccTotal', fmt(cashCarryTotal));
+      setText('ccRate', fmtPct(cashCarryRate));
+
+      setText('rccSpread', `Spot invertido - futuro = ${fmt((S * (1 + r * D / base)) - F)}`);
+      setText('rccUnit', fmt(reverseCashCarryUnit));
+      setText('rccTotal', fmt(reverseCashCarryTotal));
+      setText('rccRate', fmtPct(reverseCashCarryRate));
+
+      const fvstext = F >= syntheticF
+        ? `Futuro caro vs sintético = ${fmt(F - syntheticF)}`
+        : `Sintético caro vs futuro = ${fmt(syntheticF - F)}`;
+      setText('fsSpread', fvstext);
+      setText('fsUnit', fmt(futureVsSyntheticUnit));
+      setText('fsTotal', fmt(futureVsSyntheticTotal));
+      setText('fsRate', fmtPct(futureVsSyntheticRate));
+
+      setText('scSpread', `Sintético - spot financiado = ${fmt(syntheticF - fairFromCaucion)}`);
+      setText('scUnit', fmt(syntheticVsCaucionUnit));
+      setText('scTotal', fmt(syntheticVsCaucionTotal));
+      setText('scRate', fmtPct(syntheticVsCaucionRate));
+
+      const candidates = [
+        {
+          label: cashCarryUnit > 0
+            ? 'Comprar spot, financiar con caución y vender futuro'
+            : 'Sin ventaja en cash & carry con futuro',
+          value: cashCarryUnit,
+          kind: cashCarryUnit > 0 ? 'ok' : 'warn'
+        },
+        {
+          label: reverseCashCarryUnit > 0
+            ? 'Vender spot, colocar tasa y comprar futuro'
+            : 'Sin ventaja en reverse cash & carry',
+          value: reverseCashCarryUnit,
+          kind: reverseCashCarryUnit > 0 ? 'ok' : 'warn'
+        },
+        {
+          label: futureVsSyntheticUnit > 0
+            ? (F >= syntheticF
+                ? 'Vender futuro y comprar sintético'
+                : 'Comprar futuro y vender sintético')
+            : 'Sin ventaja clara entre futuro y sintético',
+          value: futureVsSyntheticUnit,
+          kind: futureVsSyntheticUnit > 0 ? 'ok' : 'warn'
+        },
+        {
+          label: syntheticVsCaucionUnit > 0
+            ? 'Comprar spot financiado y vender sintético'
+            : 'Sintético rinde menos que caución',
+          value: syntheticVsCaucionUnit,
+          kind: syntheticVsCaucionUnit > 0 ? 'ok' : 'warn'
+        }
+      ];
+
+      const best = [...candidates].sort((a, b) => b.value - a.value)[0];
+      const signal = document.getElementById('signal');
+
+      if (best.value > threshold) {
+        setText('bestTrade', `${best.label} | Neto por unidad: ${fmt(best.value)}`);
+        signal.className = 'signal ok';
+        signal.textContent = 'Oportunidad potencial detectada';
+      } else if (best.value > 0) {
+        setText('bestTrade', `${best.label} | Neto por unidad: ${fmt(best.value)}`);
+        signal.className = 'signal warn';
+        signal.textContent = 'Spread positivo, pero por debajo del umbral';
+      } else {
+        setText('bestTrade', 'No aparece una oportunidad neta clara con estos supuestos');
+        signal.className = 'signal bad';
+        signal.textContent = 'No hay arbitraje neto bajo los costos cargados';
+      }
+    }
+
+    ids.forEach(id => document.getElementById(id).addEventListener('input', calc));
+    calc();
+  </script>
+</body>
+</html>
